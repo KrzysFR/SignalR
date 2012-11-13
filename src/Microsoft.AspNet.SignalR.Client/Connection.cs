@@ -483,7 +483,7 @@ namespace Microsoft.AspNet.SignalR.Client
 
         private static string CreateQueryString(IDictionary<string, string> queryString)
         {
-            return String.Join("&", queryString.Select(kvp => kvp.Key + "=" + kvp.Value).ToArray());
+            return String.Join("&", queryString.Select(kvp => Uri.EscapeDataString(kvp.Key) + "=" + Uri.EscapeDataString(kvp.Value)).ToArray());
         }
     }
 }
