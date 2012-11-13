@@ -24,7 +24,10 @@ namespace Microsoft.AspNet.SignalR.Client
     /// </summary>
     public class Connection : IConnection
     {
-        private static Version _assemblyVersion;
+        /// <summary>
+        /// Default User Agent for all new connections.
+        /// </summary>
+        private static string _defaultUserAgent;
 
         private IClientTransport _transport;
 
@@ -61,6 +64,19 @@ namespace Microsoft.AspNet.SignalR.Client
         /// Occurs when the <see cref="Connection"/> state changes.
         /// </summary>
         public event Action<StateChange> StateChanged;
+
+        static Connection()
+        {
+            // We need to compute the default user agent once
+#if WINDOWS_PHONE
+            // http://msdn.microsoft.com/en-us/library/ff637320(VS.95).aspx
+            _defaultUserAgent = CreateUserAgentString("SignalR.Client.WP7");
+#elif SILVERLIGHT
+            // Useragent is not possible to set with Silverlight, not on the UserAgent property of the request nor in the Headers key/value in the request
+#else
+            _defaultUserAgent = CreateUserAgentString("SignalR.Client");
+#endif
+        }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Connection"/> class.
@@ -106,6 +122,7 @@ namespace Microsoft.AspNet.SignalR.Client
 
             Url = url;
             QueryString = queryString;
+            UserAgent = _defaultUserAgent;
             _groups = new HashSet<string>();
             Items = new ConcurrentDictionary<string, object>(StringComparer.OrdinalIgnoreCase);
             State = ConnectionState.Disconnected;
@@ -115,6 +132,12 @@ namespace Microsoft.AspNet.SignalR.Client
         /// Gets or sets the cookies associated with the connection.
         /// </summary>
         public CookieContainer CookieContainer { get; set; }
+
+        /// <summary>
+        /// Gets or sets the User Agent for the connection.
+        /// </summary>
+        /// <remarks>This property has no effect on Silverlight</remarks>
+        public string UserAgent { get; set; }
 
         /// <summary>
         /// Gets or sets authentication information for the connection.
@@ -417,16 +440,15 @@ namespace Microsoft.AspNet.SignalR.Client
         [SuppressMessage("Microsoft.Design", "CA1062:Validate arguments of public methods", MessageId = "0", Justification = "This is called by the transport layer")]
         void IConnection.PrepareRequest(IRequest request)
         {
-#if WINDOWS_PHONE
-            // http://msdn.microsoft.com/en-us/library/ff637320(VS.95).aspx
-            request.UserAgent = CreateUserAgentString("SignalR.Client.WP7");
-#else
-#if SILVERLIGHT
+#if !SILVERLIGHT
             // Useragent is not possible to set with Silverlight, not on the UserAgent property of the request nor in the Headers key/value in the request
-#else
-            request.UserAgent = CreateUserAgentString("SignalR.Client");
+            string userAgent = UserAgent ?? _defaultUserAgent;
+            if (!string.IsNullOrEmpty(userAgent))
+            {
+                request.UserAgent = userAgent;
+            }
 #endif
-#endif
+
             if (Credentials != null)
             {
                 request.Credentials = Credentials;
@@ -446,20 +468,18 @@ namespace Microsoft.AspNet.SignalR.Client
 
         private static string CreateUserAgentString(string client)
         {
-            if (_assemblyVersion == null)
-            {
-#if NETFX_CORE
-                _assemblyVersion = new Version("1.0.0");
-#else
-                _assemblyVersion = new AssemblyName(typeof(Connection).Assembly.FullName).Version;
-#endif
-            }
+            Version assemblyVersion;
+            string osVersion;
 
 #if NETFX_CORE
-            return String.Format(CultureInfo.InvariantCulture, "{0}/{1} ({2})", client, _assemblyVersion, "Unknown OS");
+            assemblyVersion = new Version("1.0.0.0");
+            osVersion = "Unknown OS";
 #else
-            return String.Format(CultureInfo.InvariantCulture, "{0}/{1} ({2})", client, _assemblyVersion, Environment.OSVersion);
+            assemblyVersion = new AssemblyName(typeof(Connection).Assembly.FullName).Version;
+            osVersion = Environment.OSVersion.ToString();
 #endif
+
+            return String.Format(CultureInfo.InvariantCulture, "{0}/{1} ({2})", client, assemblyVersion, osVersion);
         }
 
         [SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes", Justification = "The Version constructor can throw exceptions of many different types. Failure is indicated by returning false.")]
