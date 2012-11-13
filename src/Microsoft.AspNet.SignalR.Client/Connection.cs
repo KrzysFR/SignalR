@@ -443,7 +443,7 @@ namespace Microsoft.AspNet.SignalR.Client
 #if !SILVERLIGHT
             // Useragent is not possible to set with Silverlight, not on the UserAgent property of the request nor in the Headers key/value in the request
             string userAgent = UserAgent ?? _defaultUserAgent;
-            if (!string.IsNullOrEmpty(userAgent))
+            if (!String.IsNullOrEmpty(userAgent))
             {
                 request.UserAgent = userAgent;
             }
